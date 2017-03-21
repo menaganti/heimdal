@@ -129,6 +129,8 @@ roken_detach_prep(int argc, char **argv, char *special_arg)
     do {
         bytes = read(pipefds[0], buf, sizeof(buf));
     } while (bytes == -1 && errno == EINTR);
+    (void) close(pipefds[0]);
+    pipefds[0] = -1;
     if (bytes == -1) {
         /*
          * No need to wait for the process.  We've killed it.  If it
@@ -163,6 +165,7 @@ roken_detach_finish(const char *dir, int daemon_child_fd)
     ssize_t bytes;
     int fd;
 
+    pidfile(NULL);
     if (pipefds[1] == -1 && daemon_child_fd != -1)
         pipefds[1] = daemon_child_fd;
     if (pipefds[0] != -1)

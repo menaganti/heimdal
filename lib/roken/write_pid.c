@@ -61,7 +61,7 @@ pid_file_write(const char *progname)
 	free(ret);
 	return NULL;
     }
-    fprintf(fp, "%u", (unsigned)getpid());
+    fprintf(fp, "%lu\n", (unsigned long)getpid());
     fclose(fp);
     return ret;
 }
@@ -76,28 +76,40 @@ pid_file_delete(char **filename)
     }
 }
 
-#ifndef HAVE_PIDFILE
 static char *pidfile_path;
+static pid_t pidfile_pid;
 
 static void
 pidfile_cleanup(void)
 {
-    if (pidfile_path != NULL)
+    if (pidfile_path != NULL && pidfile_pid == getpid())
 	pid_file_delete(&pidfile_path);
 }
 
 ROKEN_LIB_FUNCTION void ROKEN_LIB_CALL
 pidfile(const char *bname)
 {
+    /*
+     * If the OS has a pidfile(), call that, but still call
+     * pid_file_write().  Even if both want to write the same file,
+     * writing it twice will still work.
+     */
+#ifdef HAVE_PIDFILE
+#undef pidfile
+    pidfile(bname);
+#endif
+
     if (pidfile_path != NULL)
 	return;
     if (bname == NULL)
 	bname = getprogname();
     pidfile_path = pid_file_write(bname);
+    pidfile_pid = getpid();
 #if defined(HAVE_ATEXIT)
-    atexit(pidfile_cleanup);
+    if (pidfile_path != NULL)
+        atexit(pidfile_cleanup);
 #elif defined(HAVE_ON_EXIT)
-    on_exit(pidfile_cleanup);
+    if (pidfile_path != NULL)
+        on_exit(pidfile_cleanup);
 #endif
 }
-#endif
